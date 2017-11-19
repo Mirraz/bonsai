@@ -559,20 +559,20 @@ create_conn_info(char *mech, SOCKET sock, PyObject *creds) {
     char *realm = NULL;
 
     /* Get credential information, if it's given. */
-    if (PyTuple_Check(creds) && PyTuple_Size(creds) > 1) {
+    if (PyDict_Check(creds)) {
         if (strcmp(mech, "SIMPLE") == 0) {
-            tmp = PyTuple_GetItem(creds, 0);
+            tmp = PyDict_GetItemString(creds, "binddn");
             binddn = PyObject2char(tmp);
         } else {
-            tmp = PyTuple_GetItem(creds, 0);
+            tmp = PyDict_GetItemString(creds, "username");
             authcid = PyObject2char(tmp);
-            tmp = PyTuple_GetItem(creds, 2);
+            tmp = PyDict_GetItemString(creds, "realm");
             realm = PyObject2char(tmp);
-            tmp = PyTuple_GetItem(creds, 3);
+            tmp = PyDict_GetItemString(creds, "authzid");
             authzid = PyObject2char(tmp);
         }
-        tmp = PyTuple_GetItem(creds, 1);
-        passwd = (tmp != Py_None ? PyObject2char(tmp) : NULL);
+        tmp = PyDict_GetItemString(creds, "password");
+        passwd = PyObject2char(tmp);
     }
 
     defaults = malloc(sizeof(ldap_conndata_t));
