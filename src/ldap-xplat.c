@@ -166,13 +166,14 @@ _ldap_control_free(LDAPControl *ctrl) {
 #ifdef HAVE_KRB5
 
 static int
-create_krb5_cred(krb5_context ctx, char *realm, char *user, char *password,
+create_krb5_cred(krb5_context ctx, char *realm, char *user, char *password, char *ktname,
         krb5_ccache *ccache, gss_cred_id_t *gsscred, char **errmsg) {
     int rc = 0, len = 0;
     unsigned int minor_stat = 0, major_stat = 0;
     const char *errmsg_tmp = NULL;
     const char *cctype = NULL;
     krb5_ccache defcc = NULL;
+    krb5_keytab keytab = NULL;
     krb5_creds creds;
     krb5_principal princ = NULL;
 
@@ -202,9 +203,13 @@ create_krb5_cred(krb5_context ctx, char *realm, char *user, char *password,
 
         rc= krb5_cc_store_cred(ctx, *ccache, &creds);
         if (rc != 0) goto end;
+
+    } else if (ktname != NULL) {
+        rc = krb5_kt_resolve(ctx, ktname, &keytab);
+        if (rc != 0) goto end;
     }
 
-    major_stat = gss_krb5_import_cred(&minor_stat, *ccache, princ, NULL, gsscred);
+    major_stat = gss_krb5_import_cred(&minor_stat, *ccache, princ, keytab, gsscred);
 
 end:
     if (princ != NULL) krb5_free_principal(ctx, princ);
@@ -557,6 +562,7 @@ create_conn_info(char *mech, SOCKET sock, PyObject *creds) {
     char *binddn = NULL;
     char *passwd = NULL;
     char *realm = NULL;
+    char *ktname = NULL;
 
     /* Get credential information, if it's given. */
     if (PyDict_Check(creds)) {
@@ -570,6 +576,8 @@ create_conn_info(char *mech, SOCKET sock, PyObject *creds) {
             realm = PyObject2char(tmp);
             tmp = PyDict_GetItemString(creds, "authzid");
             authzid = PyObject2char(tmp);
+            tmp = PyDict_GetItemString(creds, "ktname");
+            ktname = PyObject2char(tmp);
         }
         tmp = PyDict_GetItemString(creds, "password");
         passwd = PyObject2char(tmp);
@@ -582,6 +590,7 @@ create_conn_info(char *mech, SOCKET sock, PyObject *creds) {
         free(realm);
         free(authcid);
         free(authzid);
+        free(ktname);
         return (void *)PyErr_NoMemory();
     }
 
@@ -590,6 +599,7 @@ create_conn_info(char *mech, SOCKET sock, PyObject *creds) {
     defaults->authcid = authcid;
     defaults->passwd = passwd;
     defaults->authzid = authzid;
+    defaults->ktname = ktname;
 
     defaults->binddn = binddn;
 #ifdef WIN32
@@ -621,6 +631,7 @@ dealloc_conn_info(ldap_conndata_t* info) {
     free(info->mech);
     free(info->passwd);
     free(info->realm);
+    free(info->ktname);
 #ifdef HAVE_KRB5
     remove_krb5_cred(info->ctx, info->ccache, &(info->gsscred));
     free(info->errmsg);
@@ -683,7 +694,7 @@ ldap_init_thread_func(void *params) {
 #ifdef HAVE_KRB5
     if (data->info->request_tgt == 1) {
         rc = create_krb5_cred(data->info->ctx, data->info->realm,
-                data->info->authcid, data->info->passwd,
+                data->info->authcid, data->info->passwd, data->info->ktname,
                 &(data->info->ccache), &(data->info->gsscred),
                 &(data->info->errmsg));
         if (rc != 0) {

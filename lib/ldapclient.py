@@ -170,10 +170,11 @@ class LDAPClient:
                 "password",
                 "realm",
                 "authzid",
+                "ktname",
             }:
                 raise ValueError("%s mechanism needs only this credential "
                                  "information: username, password, realm, "
-                                 "authzid)."
+                                 "authzid, ktname)."
                                  % self.__mechanism)
 
             self.__credentials = creds

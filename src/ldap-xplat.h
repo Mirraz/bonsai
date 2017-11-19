@@ -55,6 +55,7 @@ typedef struct ldap_conndata_s {
     char *authcid;
     char *passwd;
     char *authzid;
+    char *ktname;
 #ifdef WIN32
     /* For the Windows's thread. */
     LDAP *ld;
